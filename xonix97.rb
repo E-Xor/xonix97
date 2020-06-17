@@ -10,30 +10,23 @@
 
 require "gosu"
 
-# WIDTH, HEIGHT = 520, 390
-WIDTH, HEIGHT = 520, 340
+WIDTH, HEIGHT = 510, 322
 
 module GameDefs
   Blue  = 0
   Black = 1
   Red   = 2
-  Border = 18
-#define OBJ_OFFSET 3
-#define OBJ_SIZE ((2*OBJ_OFFSET)+1)
-#define OBJ_MOVE 4
-#define BORDER_THICKNESS (OBJ_OFFSET+4*OBJ_MOVE-1)
+  Border = 20
 end
 
 def bresenham_line
 end
 
-def scanline_flood_fill
-end
-
 class Dot
   attr_reader :x, :y
-  OFFSET = 2
-  Z_ORDER = 3
+  OFFSET = 3
+  Z_ORDER = 4
+  GAP = 50
 
   def initialize(x: nil, y: nil)
 
@@ -42,36 +35,27 @@ class Dot
     if x
       @x = x
     else
-      @x = GameDefs::Border + rand(WIDTH - 2 * GameDefs::Border)
+      @x = GAP + rand(WIDTH - 2 * GAP)
     end
 
     if y
       @y = y
     else
-      @y = GameDefs::Border + rand(HEIGHT - 2 * GameDefs::Border)
+      @y = GAP + rand(HEIGHT - 2 * GAP)
     end
 
-    @x_speed = rand(2) + 1
-    @y_speed = rand(2) + 1
     @x_speed = -@x_speed if rand(2) == 1
     @y_speed = -@y_speed if rand(2) == 1
-
-    # puts "x: #{@x}"
-    # puts "y: #{@y}"
-    # puts "x_speed: #{@x_speed}"
-    # puts "y_speed: #{@y_speed}"
   end
 
   def bounce(field_bmp)
 
     if y_border || next_pix_y(field_bmp) == @bounce_pix 
       @y_speed = -@y_speed
-      # puts "bounce y, speed: #{@y_speed}"
     end
 
     if x_border || next_pix_x(field_bmp) == @bounce_pix
       @x_speed = -@x_speed
-      # puts "bounce x, speed: #{@x_speed}"
     end
 
   end
@@ -89,8 +73,6 @@ class Dot
   private
 
   def next_pix_y(field_bmp)
-    # puts "next_pix_y #{@x}"
-    # puts "next_pix_y #{@y + @y_speed}"
     if @y_speed > 0
       next_y = field_bmp[@y + @y_speed + OFFSET]
     else
@@ -102,13 +84,10 @@ class Dot
     else 
       pix = @bounce_pix
     end
-    # puts "next_pix_y pix: #{pix}"
     pix
   end
 
   def next_pix_x(field_bmp)
-    # puts "next_pix_x #{@x + @x_speed}"
-    # puts "next_pix_x #{@y}"
     if @x_speed > 0
       pix = field_bmp[@y][@x + @x_speed + OFFSET]
     else
@@ -117,7 +96,6 @@ class Dot
 
     pix = @bounce_pix unless pix
 
-    # puts "next_pix_x pix: #{pix}"
     pix
   end
 
@@ -141,7 +119,9 @@ end
 class WhiteDot < Dot
   def initialize
     @bounce_pix = GameDefs::Blue
-    @image = Gosu::Image.new("media/wdot.bmp")
+    @image = Gosu::Image.new("media/wdot.png")
+    @x_speed = rand(2) + 1
+    @y_speed = rand(2) + 1
 
     super
   end
@@ -150,20 +130,25 @@ end
 class BlackDot < Dot
   def initialize
     @bounce_pix = GameDefs::Black
-    @image = Gosu::Image.new("media/bdot.bmp")
-    # @x = GameDefs::Border + rand(WIDTH - 2 * GameDefs::Border)
-    y = rand(GameDefs::Border) + (HEIGHT - GameDefs::Border)
-    super(y: y)
+    @image = Gosu::Image.new("media/bdot.png")
+
+    @x_speed = 2
+    @y_speed = 2
+
+    y = rand(4) + (HEIGHT - GameDefs::Border + 10)
+    x = GameDefs::Border + rand(WIDTH - GameDefs::Border)
+    super(x: x, y: y)
   end
 end
 
 class LineDot < Dot
   def initialize
     @bounce_pix = GameDefs::Blue
-    @image = Gosu::Image.new("media/bdot.bmp")
-    
-    super
 
+    @x_speed = 1
+    @y_speed = 1
+
+    super
   end
 end
 
@@ -195,14 +180,13 @@ end
 class Field
   attr_reader :field_bmp
   Z_ORDER = 2
-  # AQUA = Gosu::Color.rgba(17, 128, 127, 255)
   AQUA = Gosu::Color.rgba(0, 132, 132, 255)
 
   def initialize
     @field_bmp = Array.new(HEIGHT) { Array.new(WIDTH) }
     HEIGHT.times do |i|
       WIDTH.times do |j|
-        if i < GameDefs::Border || j < GameDefs::Border || i > HEIGHT - GameDefs::Border || j > WIDTH - GameDefs::Border
+        if i < GameDefs::Border - 1 || j < GameDefs::Border - 1 || i >= HEIGHT - GameDefs::Border || j >= WIDTH - GameDefs::Border
           @field_bmp[i][j] = GameDefs::Blue
         else
           @field_bmp[i][j] = GameDefs::Black
@@ -211,7 +195,6 @@ class Field
     end
 
     @modified = true
-
   end
 
   def update
@@ -235,9 +218,9 @@ class Field
     #   end
     # end
 
-    # Max FPS
     @field_bmp.each_with_index do |l, i|
       j = 0
+      # Add red
       while j < WIDTH
         if l[j] == GameDefs::Black
           len = 1 
@@ -254,53 +237,124 @@ class Field
       end
     end
 
-    # Can be even faster better
+    # Can be even faster
     # rmagic_image = Magick::Image.constitute(width_arg, height_arg, map_arg, pixels_arg)
     # Gosu::Image.new(rmagic_image)
+  end
+
+  def flood_fill
+    # replace red with blue
+    HEIGHT.times do |i|
+      WIDTH.times do |j|
+        @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Red
+      end
+    end
+
+    # for each white dot
+    #   unless scanned
+
+    # checking the source might not be cheaper than checking the dot
+    # while pop queue
+    #   scan right & left until wall
+    #   queue north unles from north & south unless from south
+    #   set from south & north
+    #   delete scanned from quue
+    # Alternative to source tracking is to check if a filed is converted
+
+    # while pop queue
+    #   scan right & left until wall
+    #   delete scanned from queue
+    #   queue north & south
+
   end
 
 end
 
 class Player
-  SIZE = 5
-  OFFSET = 2
-  SPEED = 2
+  SIZE = 7
+  OFFSET = 3
+  SPEED = 4
   Z_ORDER = 10
 
   def initialize
     @x_speed = 0
     @y_speed = 0
-    @x = WIDTH / 2
-    @y = 0
+    @x = 251 # WIDTH / 2
+    @y = 3
     @image = Gosu::Image.new("media/player.bmp")
   end
 
   def draw
-    @image.draw(@x - OFFSET, @y, Z_ORDER)
+    @image.draw(@x - OFFSET, @y - OFFSET, Z_ORDER)
   end
 
-  def update
-    move
+  def update(field_bmp)
     direction
+    move(field_bmp)
   end
 
-  def move
+  def move(field_bmp)
+    # check before move
+    # check the speed direction too, allow to move away from the edge
+    if @x - SIZE < 0 || @x + SIZE > WIDTH
+      @x_speed = 0
+    end
+
+    if @y - SIZE < 0 || @y + SIZE > HEIGHT
+      @y_speed = 0
+    end
+
     @x += @x_speed
     @y += @y_speed
+
+    (@x - OFFSET .. @x + OFFSET).each do |j|
+      (@y - OFFSET .. @y + OFFSET).each do |i|
+        begin
+          if field_bmp[i][j] == GameDefs::Black
+            field_bmp[i][j] = GameDefs::Red
+          end
+        rescue => e
+          puts i
+          puts j # 322
+          raise e
+        end
+      end
+    end
+
+
+    # End of red path
+    begin
+      if field_bmp[@y][@x] == GameDefs::Blue && (field_bmp[@y - @y_speed][@x - @x_speed] == GameDefs::Red)
+        @x_speed = 0
+        @y_speed = 0
+        return true
+      else
+        return nil
+      end
+    rescue => e
+      puts @x
+      puts @y
+      puts @x_speed
+      puts @y_speed
+      puts @x - @x_speed
+      puts @y - @y_speed
+      raise e
+    end
+
+    return nil
   end
 
   def direction
-    case Gosu.button_down?
-    when Gosu::KB_LEFT
+    if Gosu.button_down? Gosu::KB_LEFT
       @x_speed = -SPEED
       @y_speed = 0
-    when Gosu::KB_RIGHT
+    elsif Gosu.button_down? Gosu::KB_RIGHT
       @x_speed = SPEED
       @y_speed = 0
-    when Gosu::KB_UP
+    elsif Gosu.button_down? Gosu::KB_UP
       @x_speed = 0
       @y_speed = -SPEED
-    when Gosu::KB_DOWN
+    elsif Gosu.button_down? Gosu::KB_DOWN
       @x_speed = 0
       @y_speed = SPEED
     end
@@ -315,27 +369,37 @@ class Xonix97 < Gosu::Window
     self.caption = "Xonix97"
 
     @field = Field.new
-    puts @field.field_bmp.count
-    puts @field.field_bmp.first.count
 
     @player = Player.new
     @white_dots = 6.times.map{ WhiteDot.new }
     @black_dots = 3.times.map{ BlackDot.new }
     @font = Gosu::Font.new(20)
     @orange_lines = 3.times.map{ OrangeLine.new }
+    skip_update = false
   end
   
   def update
-    @white_dots.each do |w|
-      w.update(@field.field_bmp)
-    end
+    # return
+    @skip_update = !@skip_update # 30 FPS emulation
 
-    @black_dots.each do |w|
-      w.update(@field.field_bmp)
-    end
+    unless @skip_update
+      @skip_update = false
 
-    @orange_lines.each do |l|
-      l.update(@field.field_bmp)
+      if @player.update(@field.field_bmp)
+        @field.flood_fill
+      end
+
+      @white_dots.each do |w|
+        w.update(@field.field_bmp)
+      end
+
+      @black_dots.each do |w|
+        w.update(@field.field_bmp)
+      end
+
+      @orange_lines.each do |l|
+        l.update(@field.field_bmp)
+      end
     end
   end
   
