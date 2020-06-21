@@ -13,17 +13,15 @@ require "gosu"
 WIDTH, HEIGHT = 510, 322
 
 module GameDefs
-  Blue  = 0
-  Black = 1
-  Red   = 2
-  Border = 20
-end
-
-def bresenham_line
+  Blue    = 0
+  Black   = 1
+  Red     = 2
+  Checked = 10
+  Border  = 20
 end
 
 class Dot
-  attr_reader :x, :y
+  attr_reader :x, :y, :x_speed, :y_speed
   OFFSET = 3
   Z_ORDER = 4
   GAP = 50
@@ -153,6 +151,7 @@ class LineDot < Dot
 end
 
 class OrangeLine
+  attr_reader :end_one, :end_two
   ORANGE = Gosu::Color.rgba(132, 132, 0, 255)
   Z_ORDER = 3
 
@@ -164,17 +163,72 @@ class OrangeLine
   def update(field_bmp)
     @end_one.update(field_bmp)
     @end_two.update(field_bmp)
+
+    cover_field(field_bmp)
   end
 
   def draw
-    Gosu.draw_quad(
-      @end_one.x, @end_one.y, ORANGE,
-      @end_one.x, @end_one.y+4, ORANGE,
-      @end_two.x, @end_two.y, ORANGE,
-      @end_two.x, @end_two.y+4, ORANGE,
-      Z_ORDER
-    )
+    # Gosu.draw_quad(
+    #   @end_one.x, @end_one.y, ORANGE,
+    #   @end_one.x, @end_one.y+4, ORANGE,
+    #   @end_two.x, @end_two.y, ORANGE,
+    #   @end_two.x, @end_two.y+4, ORANGE,
+    #   Z_ORDER
+    # )
+
+    angle = Gosu.angle(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
+    length = Gosu.distance(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
+    width = 3
+    Gosu.rotate(angle - 90, @end_one.x, @end_one.y) do
+      Gosu.draw_rect(@end_one.x, @end_one.y, length, width, ORANGE, Z_ORDER)
+    end
   end
+
+  private
+
+  def cover_field(field_bmp)
+    # Based on Bresenham's line
+    # Line plus south, north, east, west pixels for fatness
+
+    # < 1ms
+
+    x1, y1 = @end_one.x, @end_one.y
+    x2, y2 = @end_two.x, @end_two.y
+ 
+    steep = (y2 - y1).abs > (x2 - x1).abs
+ 
+    if steep
+      x1, y1 = y1, x1
+      x2, y2 = y2, x2
+    end
+ 
+    if x1 > x2
+      x1, x2 = x2, x1
+      y1, y2 = y2, y1
+    end
+ 
+    deltax = x2 - x1
+    deltay = (y2 - y1).abs
+    error = deltax / 2
+    ystep = y1 < y2 ? 1 : -1
+
+    y = y1
+    x1.upto(x2) do |x|
+      pixel = steep ? [y,x] : [x,y]
+      field_bmp[pixel[1]][pixel[0]] = GameDefs::Black
+      field_bmp[pixel[1]+1][pixel[0]] = GameDefs::Black
+      field_bmp[pixel[1]][pixel[0]+1] = GameDefs::Black
+      field_bmp[pixel[1]-1][pixel[0]] = GameDefs::Black
+      field_bmp[pixel[1]][pixel[0]-1] = GameDefs::Black
+      error -= deltay
+      if error < 0
+        y += ystep
+        error += deltax
+      end
+    end
+
+  end
+
 end
 
 class Field
@@ -218,40 +272,73 @@ class Field
     #   end
     # end
 
-    @field_bmp.each_with_index do |l, i|
-      j = 0
-      # Add red
-      while j < WIDTH
-        if l[j] == GameDefs::Black
-          len = 1 
-          start = j
-          j += 1
-          while l[j]  == GameDefs::Black
-            len += 1
-            j += 1
-          end
-          Gosu.draw_rect(start, i, len, 1, Gosu::Color::BLACK, Z_ORDER)
-        else
-          j += 1
-        end
-      end
-    end
-
-    # Can be even faster
-    # rmagic_image = Magick::Image.constitute(width_arg, height_arg, map_arg, pixels_arg)
-    # Gosu::Image.new(rmagic_image)
+    draw_pieces(GameDefs::Black, Gosu::Color::BLACK)
+    draw_pieces(GameDefs::Red, Gosu::Color::RED)
   end
 
-  def flood_fill
+  def flood_fill(white_dots, orange_lines)
+
     # replace red with blue
+    t0 = Gosu::milliseconds
+
     HEIGHT.times do |i|
       WIDTH.times do |j|
         @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Red
       end
     end
 
+    t1 = Gosu::milliseconds
+    puts "t1: #{t1-t0}"
+
     # for each white dot
     #   unless scanned
+    start_point = white_dots + orange_lines.map(&:end_one) + orange_lines.map(&:end_two)
+    start_point.each do |d|
+      next if @field_bmp[d.y][d.x] == GameDefs::Checked
+
+      queue = [[d.x, d.y]]
+      # 5.times do
+      while queue.size > 0
+        x, y = queue.pop
+        # puts "x, y: #{x}, #{y}"
+        # puts "@field_bmp[y][x]: #{@field_bmp[y][x]}"
+        if @field_bmp[y][x] == GameDefs::Black
+          # puts 'past if'
+          @field_bmp[y][x] = GameDefs::Checked
+          # puts "@field_bmp[y][x]: #{@field_bmp[y][x]}"
+          queue << [x + 1, y]
+          queue << [x, y + 1]
+          queue << [x - 1, y]
+          queue << [x, y - 1]
+          # puts "queue: #{queue.inspect}"
+        end
+      end
+    end
+
+    t2 = Gosu::milliseconds
+    puts "t2: #{t2-t1}"
+
+    # Replace Black with Blue and Checked with Black
+
+    HEIGHT.times do |i|
+      WIDTH.times do |j|
+        @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Black
+        @field_bmp[i][j] = GameDefs::Black if @field_bmp[i][j] == GameDefs::Checked
+      end
+    end
+
+    t3 = Gosu::milliseconds
+    puts "t3: #{t3-t2}"
+
+# field at the start
+# t1: 13
+# t2: 121
+# t3: 17
+
+# field at the end
+# t1: 13
+# t2: 14
+# t3: 15
 
     # checking the source might not be cheaper than checking the dot
     # while pop queue
@@ -265,7 +352,35 @@ class Field
     #   scan right & left until wall
     #   delete scanned from queue
     #   queue north & south
+  end
 
+  private
+
+  def draw_pieces(field_bit, filed_color)
+
+    # Maybe faster
+    # rmagic_image = Magick::Image.constitute(width_arg, height_arg, map_arg, pixels_arg)
+    # Gosu::Image.new(rmagic_image)
+
+    # 4-8 ms
+    @field_bmp.each_with_index do |l, i|
+      j = 0
+      # Add red
+      while j < WIDTH
+        if l[j] == field_bit
+          len = 1 
+          start = j
+          j += 1
+          while l[j]  == field_bit
+            len += 1
+            j += 1
+          end
+          Gosu.draw_rect(start, i, len, 1, filed_color, Z_ORDER)
+        else
+          j += 1
+        end
+      end
+    end
   end
 
 end
@@ -296,11 +411,11 @@ class Player
   def move(field_bmp)
     # check before move
     # check the speed direction too, allow to move away from the edge
-    if @x - SIZE < 0 || @x + SIZE > WIDTH
+    if (@x_speed < 0 && @x - OFFSET <= 1) || (@x_speed > 0 && @x + OFFSET >= WIDTH - 3)
       @x_speed = 0
     end
 
-    if @y - SIZE < 0 || @y + SIZE > HEIGHT
+    if (@y_speed < 0 && @y - OFFSET <= 1) || (@y_speed > 0 && @y + OFFSET >= HEIGHT - 3)
       @y_speed = 0
     end
 
@@ -310,17 +425,16 @@ class Player
     (@x - OFFSET .. @x + OFFSET).each do |j|
       (@y - OFFSET .. @y + OFFSET).each do |i|
         begin
-          if field_bmp[i][j] == GameDefs::Black
+          if field_bmp[i] && field_bmp[i][j] == GameDefs::Black
             field_bmp[i][j] = GameDefs::Red
           end
         rescue => e
           puts i
-          puts j # 322
+          puts j
           raise e
         end
       end
     end
-
 
     # End of red path
     begin
@@ -386,7 +500,7 @@ class Xonix97 < Gosu::Window
       @skip_update = false
 
       if @player.update(@field.field_bmp)
-        @field.flood_fill
+        @field.flood_fill(@white_dots, @orange_lines)
       end
 
       @white_dots.each do |w|
@@ -419,7 +533,11 @@ class Xonix97 < Gosu::Window
       l.draw
     end
 
-    @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
+    # 1 frame = 17ms @60 FPS
+    if Gosu.fps < 59
+      @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
+      # puts "#{Gosu.fps} FPS"
+    end
   end
 end
 
