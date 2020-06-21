@@ -127,7 +127,7 @@ end
 
 class BlackDot < Dot
   def initialize
-    @bounce_pix = GameDefs::Black
+    @bounce_pix = GameDefs::Black # and Red
     @image = Gosu::Image.new("media/bdot.png")
 
     @x_speed = 2
@@ -190,6 +190,19 @@ class OrangeLine
     # Based on Bresenham's line
     # Line plus south, north, east, west pixels for fatness
 
+    # The line is always drawn from left to right at the closer to horisontal angle.
+    # So two flips might be needed
+    # 1. y diff bigger than x diff, meaning line is closer to vertical
+    #    swap x and y coordinates in this case
+    # 2. top is on right, bottom is on left 
+    #    swap top and bottom
+    #    line can be built upwards or downwards, but always left to right
+    # Main Loop
+    #   Increase x and draw a pixel
+    #   If error < 0 increase y in the drawing direction
+    #   If error < 0 add x diff to it
+    #   Every step decrease error by y diff, which is by definition smaller than x diff
+
     # < 1ms
 
     x1, y1 = @end_one.x, @end_one.y
@@ -207,10 +220,10 @@ class OrangeLine
       y1, y2 = y2, y1
     end
  
-    deltax = x2 - x1
-    deltay = (y2 - y1).abs
-    error = deltax / 2
-    ystep = y1 < y2 ? 1 : -1
+    delta_x = x2 - x1
+    delta_y = (y2 - y1).abs
+    error = delta_x / 2
+    up_or_down = y1 < y2 ? 1 : -1
 
     y = y1
     x1.upto(x2) do |x|
@@ -220,10 +233,10 @@ class OrangeLine
       field_bmp[pixel[1]][pixel[0]+1] = GameDefs::Black
       field_bmp[pixel[1]-1][pixel[0]] = GameDefs::Black
       field_bmp[pixel[1]][pixel[0]-1] = GameDefs::Black
-      error -= deltay
+      error -= delta_y
       if error < 0
-        y += ystep
-        error += deltax
+        y += up_or_down
+        error += delta_x
       end
     end
 
@@ -261,26 +274,15 @@ class Field
   def draw
     Gosu.draw_rect(0, 0, WIDTH, HEIGHT, AQUA)
 
-    # 7 FPS
-    # @field_bmp.each_with_index do |l, i|
-    #   l.each_with_index do |p, j|
-    #     if p == GameDefs::Black
-    #       Gosu.draw_rect(j, i, 1, 1, Gosu::Color::BLACK)
-    #     elsif p == GameDefs::Red
-    #       Gosu.draw_rect(j, i, 1, 1, Gosu::Color::RED)
-    #     end
-    #   end
-    # end
-
     draw_pieces(GameDefs::Black, Gosu::Color::BLACK)
     draw_pieces(GameDefs::Red, Gosu::Color::RED)
   end
 
   def flood_fill(white_dots, orange_lines)
 
-    # replace red with blue
     t0 = Gosu::milliseconds
 
+    # Replace red with blue
     HEIGHT.times do |i|
       WIDTH.times do |j|
         @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Red
@@ -290,27 +292,66 @@ class Field
     t1 = Gosu::milliseconds
     puts "t1: #{t1-t0}"
 
-    # for each white dot
-    #   unless scanned
-    start_point = white_dots + orange_lines.map(&:end_one) + orange_lines.map(&:end_two)
-    start_point.each do |d|
+    # Each white dot and yellow line are starting points for the flood fill
+    if orange_lines
+      start_points = white_dots + orange_lines.map(&:end_one) + orange_lines.map(&:end_two)
+    else
+      start_points = white_dots
+    end
+
+    start_points.each do |d|
       next if @field_bmp[d.y][d.x] == GameDefs::Checked
 
       queue = [[d.x, d.y]]
-      # 5.times do
+
+      # Basic flood fill, 121ms worst, 14ms best
+      # while queue.size > 0
+      #   x, y = queue.pop
+      #   if @field_bmp[y][x] == GameDefs::Black
+      #     @field_bmp[y][x] = GameDefs::Checked
+      #     queue << [x + 1, y]
+      #     queue << [x, y + 1]
+      #     queue << [x - 1, y]
+      #     queue << [x, y - 1]
+      #   end
+      # end
+
+      # Scanline variation, 75ms worst, 12ms best
+      # while queue.size > 0
+      #   x_start, y = queue.pop
+      #   x = x_start
+      #   while @field_bmp[y][x] == GameDefs::Black
+      #     @field_bmp[y][x] = GameDefs::Checked
+      #     queue << [x, y + 1]
+      #     queue << [x, y - 1]
+      #     x = x + 1
+      #   end
+      #   x = x_start - 1
+      #   while @field_bmp[y][x] == GameDefs::Black
+      #     @field_bmp[y][x] = GameDefs::Checked
+      #     queue << [x, y + 1]
+      #     queue << [x, y - 1]
+      #     x = x - 1
+      #   end
+      # end
+
+      # Scanline plus direction check, 51ms worst, 12ms best
       while queue.size > 0
-        x, y = queue.pop
-        # puts "x, y: #{x}, #{y}"
-        # puts "@field_bmp[y][x]: #{@field_bmp[y][x]}"
-        if @field_bmp[y][x] == GameDefs::Black
-          # puts 'past if'
+        x_start, y, from_south, from_north = queue.pop
+        x = x_start
+        while @field_bmp[y][x] == GameDefs::Black
           @field_bmp[y][x] = GameDefs::Checked
-          # puts "@field_bmp[y][x]: #{@field_bmp[y][x]}"
-          queue << [x + 1, y]
-          queue << [x, y + 1]
-          queue << [x - 1, y]
-          queue << [x, y - 1]
-          # puts "queue: #{queue.inspect}"
+          queue << [x, y + 1] unless @field_bmp[y + 1][x] == GameDefs::Checked
+          queue << [x, y - 1] unless @field_bmp[y - 1][x] == GameDefs::Checked
+          x = x + 1
+        end
+
+        x = x_start - 1
+        while @field_bmp[y][x] == GameDefs::Black
+          @field_bmp[y][x] = GameDefs::Checked
+          queue << [x, y + 1] unless @field_bmp[y + 1][x] == GameDefs::Checked
+          queue << [x, y - 1] unless @field_bmp[y - 1][x] == GameDefs::Checked
+          x = x - 1
         end
       end
     end
@@ -357,12 +398,8 @@ class Field
   private
 
   def draw_pieces(field_bit, filed_color)
-
-    # Maybe faster
-    # rmagic_image = Magick::Image.constitute(width_arg, height_arg, map_arg, pixels_arg)
-    # Gosu::Image.new(rmagic_image)
-
     # 4-8 ms
+
     @field_bmp.each_with_index do |l, i|
       j = 0
       # Add red
@@ -511,8 +548,10 @@ class Xonix97 < Gosu::Window
         w.update(@field.field_bmp)
       end
 
-      @orange_lines.each do |l|
-        l.update(@field.field_bmp)
+      if @orange_lines
+        @orange_lines.each do |l|
+          l.update(@field.field_bmp)
+        end
       end
     end
   end
@@ -529,8 +568,10 @@ class Xonix97 < Gosu::Window
       w.draw
     end
 
-    @orange_lines.each do |l|
-      l.draw
+    if @orange_lines
+      @orange_lines.each do |l|
+        l.draw
+      end
     end
 
     # 1 frame = 17ms @60 FPS
@@ -540,5 +581,8 @@ class Xonix97 < Gosu::Window
     end
   end
 end
+
+# check original for line drawing in ui and bitmap
+# check original for flood fill again
 
 Xonix97.new.show
