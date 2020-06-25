@@ -8,7 +8,20 @@
 # brew install sdl2
 # gem install gosu
 
-require "gosu"
+# https://github.com/pmq20/ruby-packer
+# brew install squashfs
+# Install Command Line Tools from https://developer.apple.com/download/more/
+# curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
+# chmod +x rubyc
+# ./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97 ./xonix97/xonix97.rb
+
+puts "dir :#{__dir__}"
+files = Dir["#{__dir__}/*"]
+puts "files: #{files.join(',')}"
+
+require 'rubygems'
+require 'bundler/setup'
+require 'gosu'
 
 WIDTH, HEIGHT = 510, 322
 
@@ -581,8 +594,5 @@ class Xonix97 < Gosu::Window
     end
   end
 end
-
-# check original for line drawing in ui and bitmap
-# check original for flood fill again
 
 Xonix97.new.show
