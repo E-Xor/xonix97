@@ -2,8 +2,8 @@
 
 # Xonix game based on Xonix32 introduced in 1997 for Windows 95.
 # The main difference to the DOS Xonix is orange line that paints back the field.
-# This also allows red line to selve-intersect. I think it was not allowed originally
-# to keep Flood Fill faster.
+# This version also allows red line to selve-intersect.
+# I think it was not allowed originally to keep Flood Fill faster.
 
 # brew install sdl2
 # gem install gosu
@@ -13,17 +13,69 @@
 # Install Command Line Tools from https://developer.apple.com/download/more/
 # curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
 # chmod +x rubyc
-# ./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97 ./xonix97/xonix97.rb
+# ./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97src/Ruby ./xonix97src/Ruby/xonix97.rb
+# https://github.com/pmq20/ruby-packer/issues/39
+# https://github.com/danistefanovic/build-your-own-x#build-your-own-game
 
-puts "dir :#{__dir__}"
-files = Dir["#{__dir__}/*"]
-puts "files: #{files.join(',')}"
+# 1 frame = 17ms @60 FPS
+
+# puts "__dir__ :#{__dir__}"
+# puts
+
+# files = Dir["#{__dir__}/*"]
+# puts "files in __dir__: #{files.join(',')}"
+# puts
+
+# files = Dir["./Resources/*"]
+# puts "files in ./Resources/*: #{files.join(',')}"
+# puts
+
+# files = Dir["../Resources/*"]
+# puts "files in ../Resources/*: #{files.join(',')}"
+# puts
+
+# files = Dir["#{__dir__}/../Resources/*"]
+# puts "files in __dir__/../Resources/*: #{files.join(',')}"
+# puts
+
+# files = Dir["/*"]
+# puts "files in /*: #{files.join(',')}"
+# puts
+
+# files = Dir["~/*"]
+# puts "files in ~/*: #{files.join(',')}"
+# puts
+
+# puts 'ls -al'
+# puts `ls -al`
+# puts
+
+# puts 'ls -al ~/'
+# puts `ls -al ~/`
+# puts
+
+# puts 'ls -al /'
+# puts `ls -al /`
+# puts
+
+# puts 'pwd'
+# puts `pwd`
+# puts
+
+# print "Press ENTER to continue"
+# gets
+
+MEDIA_DIR = `pwd`.chomp + '/../Resources' # not __dir__, when compiled into binary code it has differenent return compared to pwd
 
 require 'rubygems'
 require 'bundler/setup'
 require 'gosu'
 
-WIDTH, HEIGHT = 510, 322
+FIELD_WIDTH, FIELD_HEIGHT = 510, 322
+TOTAL_SQUARES = FIELD_WIDTH * FIELD_HEIGHT
+# WIDTH, HEIGHT = FIELD_WIDTH + 200, FIELD_HEIGHT
+WIDTH, HEIGHT = FIELD_WIDTH, FIELD_HEIGHT + 25
+FPS_DEBUG = true
 
 module GameDefs
   Blue    = 0
@@ -46,13 +98,13 @@ class Dot
     if x
       @x = x
     else
-      @x = GAP + rand(WIDTH - 2 * GAP)
+      @x = GAP + rand(FIELD_WIDTH - 2 * GAP)
     end
 
     if y
       @y = y
     else
-      @y = GAP + rand(HEIGHT - 2 * GAP)
+      @y = GAP + rand(FIELD_HEIGHT - 2 * GAP)
     end
 
     @x_speed = -@x_speed if rand(2) == 1
@@ -112,7 +164,7 @@ class Dot
 
   def x_border
     if @x_speed > 0
-      @x + @x_speed + OFFSET > WIDTH
+      @x + @x_speed + OFFSET > FIELD_WIDTH
     else
       @x + @x_speed - OFFSET < 0
     end
@@ -120,7 +172,7 @@ class Dot
 
   def y_border
     if @y_speed > 0
-      @y + @y_speed + OFFSET > HEIGHT
+      @y + @y_speed + OFFSET > FIELD_HEIGHT
     else
       @y + @y_speed - OFFSET < 0
     end
@@ -130,7 +182,7 @@ end
 class WhiteDot < Dot
   def initialize
     @bounce_pix = GameDefs::Blue
-    @image = Gosu::Image.new("media/wdot.png")
+    @image = Gosu::Image.new("#{MEDIA_DIR}/wdot.png")
     @x_speed = rand(2) + 1
     @y_speed = rand(2) + 1
 
@@ -141,13 +193,13 @@ end
 class BlackDot < Dot
   def initialize
     @bounce_pix = GameDefs::Black # and Red
-    @image = Gosu::Image.new("media/bdot.png")
+    @image = Gosu::Image.new("#{MEDIA_DIR}/bdot.png")
 
     @x_speed = 2
     @y_speed = 2
 
-    y = rand(4) + (HEIGHT - GameDefs::Border + 10)
-    x = GameDefs::Border + rand(WIDTH - GameDefs::Border)
+    y = rand(4) + (FIELD_HEIGHT - GameDefs::Border + 10)
+    x = GameDefs::Border + rand(FIELD_WIDTH - GameDefs::Border)
     super(x: x, y: y)
   end
 end
@@ -181,13 +233,7 @@ class OrangeLine
   end
 
   def draw
-    # Gosu.draw_quad(
-    #   @end_one.x, @end_one.y, ORANGE,
-    #   @end_one.x, @end_one.y+4, ORANGE,
-    #   @end_two.x, @end_two.y, ORANGE,
-    #   @end_two.x, @end_two.y+4, ORANGE,
-    #   Z_ORDER
-    # )
+    # Draws fat line taking rectangular and rotating it
 
     angle = Gosu.angle(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
     length = Gosu.distance(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
@@ -258,16 +304,18 @@ class OrangeLine
 end
 
 class Field
-  attr_reader :field_bmp
+  attr_reader :field_bmp, :blue_count
   Z_ORDER = 2
   AQUA = Gosu::Color.rgba(0, 132, 132, 255)
 
   def initialize
-    @field_bmp = Array.new(HEIGHT) { Array.new(WIDTH) }
-    HEIGHT.times do |i|
-      WIDTH.times do |j|
-        if i < GameDefs::Border - 1 || j < GameDefs::Border - 1 || i >= HEIGHT - GameDefs::Border || j >= WIDTH - GameDefs::Border
+    @field_bmp = Array.new(FIELD_HEIGHT) { Array.new(FIELD_WIDTH) }
+    @blue_count = 0
+    FIELD_HEIGHT.times do |i|
+      FIELD_WIDTH.times do |j|
+        if i < GameDefs::Border - 1 || j < GameDefs::Border - 1 || i >= FIELD_HEIGHT - GameDefs::Border || j >= FIELD_WIDTH - GameDefs::Border
           @field_bmp[i][j] = GameDefs::Blue
+          @blue_count += 1
         else
           @field_bmp[i][j] = GameDefs::Black
         end
@@ -285,7 +333,7 @@ class Field
   end
 
   def draw
-    Gosu.draw_rect(0, 0, WIDTH, HEIGHT, AQUA)
+    Gosu.draw_rect(0, 0, FIELD_WIDTH, FIELD_HEIGHT, AQUA)
 
     draw_pieces(GameDefs::Black, Gosu::Color::BLACK)
     draw_pieces(GameDefs::Red, Gosu::Color::RED)
@@ -293,17 +341,22 @@ class Field
 
   def flood_fill(white_dots, orange_lines)
 
-    t0 = Gosu::milliseconds
+    # t0 = Gosu::milliseconds
 
     # Replace red with blue
-    HEIGHT.times do |i|
-      WIDTH.times do |j|
-        @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Red
+    FIELD_HEIGHT.times do |i|
+      FIELD_WIDTH.times do |j|
+        
+        if @field_bmp[i][j] == GameDefs::Red
+          @field_bmp[i][j] = GameDefs::Blue 
+          @blue_count += 1
+        end
+
       end
     end
 
-    t1 = Gosu::milliseconds
-    puts "t1: #{t1-t0}"
+    # t1 = Gosu::milliseconds
+    # puts "t1: #{t1-t0}"
 
     # Each white dot and yellow line are starting points for the flood fill
     if orange_lines
@@ -348,7 +401,7 @@ class Field
       #   end
       # end
 
-      # Scanline plus direction check, 51ms worst, 12ms best
+      # Scanline with direction check, 51ms worst, 12ms best
       while queue.size > 0
         x_start, y, from_south, from_north = queue.pop
         x = x_start
@@ -369,54 +422,39 @@ class Field
       end
     end
 
-    t2 = Gosu::milliseconds
-    puts "t2: #{t2-t1}"
+    # t2 = Gosu::milliseconds
+    # puts "t2: #{t2-t1}"
 
     # Replace Black with Blue and Checked with Black
+    # Count fill % here
 
-    HEIGHT.times do |i|
-      WIDTH.times do |j|
-        @field_bmp[i][j] = GameDefs::Blue if @field_bmp[i][j] == GameDefs::Black
+    FIELD_HEIGHT.times do |i|
+      FIELD_WIDTH.times do |j|
+         
+        if @field_bmp[i][j] == GameDefs::Black
+          @field_bmp[i][j] = GameDefs::Blue
+          @blue_count += 1
+        end
+
         @field_bmp[i][j] = GameDefs::Black if @field_bmp[i][j] == GameDefs::Checked
+
       end
     end
 
-    t3 = Gosu::milliseconds
-    puts "t3: #{t3-t2}"
-
-# field at the start
-# t1: 13
-# t2: 121
-# t3: 17
-
-# field at the end
-# t1: 13
-# t2: 14
-# t3: 15
-
-    # checking the source might not be cheaper than checking the dot
-    # while pop queue
-    #   scan right & left until wall
-    #   queue north unles from north & south unless from south
-    #   set from south & north
-    #   delete scanned from quue
-    # Alternative to source tracking is to check if a filed is converted
-
-    # while pop queue
-    #   scan right & left until wall
-    #   delete scanned from queue
-    #   queue north & south
+    # t3 = Gosu::milliseconds
+    # puts "t3: #{t3-t2}"
   end
 
   private
 
   def draw_pieces(field_bit, filed_color)
+    # Draws horizontal lines of the field instead of single pixels
     # 4-8 ms
 
     @field_bmp.each_with_index do |l, i|
       j = 0
       # Add red
-      while j < WIDTH
+      while j < FIELD_WIDTH
         if l[j] == field_bit
           len = 1 
           start = j
@@ -444,9 +482,13 @@ class Player
   def initialize
     @x_speed = 0
     @y_speed = 0
-    @x = 251 # WIDTH / 2
+    @x = 251 # FIELD_WIDTH / 2
     @y = 3
-    @image = Gosu::Image.new("media/player.bmp")
+    @image = Gosu::Image.new("#{MEDIA_DIR}/player.bmp")
+
+    @level = 1
+    @score = 0
+    @lives = 3
   end
 
   def draw
@@ -461,11 +503,11 @@ class Player
   def move(field_bmp)
     # check before move
     # check the speed direction too, allow to move away from the edge
-    if (@x_speed < 0 && @x - OFFSET <= 1) || (@x_speed > 0 && @x + OFFSET >= WIDTH - 3)
+    if (@x_speed < 0 && @x - OFFSET <= 1) || (@x_speed > 0 && @x + OFFSET >= FIELD_WIDTH - 3)
       @x_speed = 0
     end
 
-    if (@y_speed < 0 && @y - OFFSET <= 1) || (@y_speed > 0 && @y + OFFSET >= HEIGHT - 3)
+    if (@y_speed < 0 && @y - OFFSET <= 1) || (@y_speed > 0 && @y + OFFSET >= FIELD_HEIGHT - 3)
       @y_speed = 0
     end
 
@@ -526,6 +568,46 @@ class Player
 
 end
 
+class StatusBar
+  Z_ORDER = 20
+  STRETCH = 0.8
+
+  # "Level:%d   Xonii:%d   Score:%d   Filled:%4.1f%%   Bonus:%d   Time:%d"
+  def initialize
+    @font = Gosu::Font.new(15) # font size
+    @status_bar_messages = {
+      complete: {
+        message: "Complete: 18.0%"
+      },
+      time: {
+        message: "Time: 0:00"
+      },
+      score: { 
+        message: "Score: 0"
+      }
+    }
+  end
+
+  def update(message_key, message_text)
+    @status_bar_messages[message_key] = {
+      message: message_text
+    }
+  end
+
+  def draw
+    text_position = 10
+    @status_bar_messages.each_value do |m|
+      @font.draw_text(m[:message], text_position, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
+      text_position += m[:message].length * 8 + 15
+    end
+
+    if Gosu.fps < 59 && FPS_DEBUG
+      @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
+    end
+
+  end
+end
+
 class Xonix97 < Gosu::Window
   def initialize
     super WIDTH, HEIGHT
@@ -533,12 +615,12 @@ class Xonix97 < Gosu::Window
     self.caption = "Xonix97"
 
     @field = Field.new
-
     @player = Player.new
     @white_dots = 6.times.map{ WhiteDot.new }
     @black_dots = 3.times.map{ BlackDot.new }
-    @font = Gosu::Font.new(20)
     @orange_lines = 3.times.map{ OrangeLine.new }
+    @status_bar = StatusBar.new
+
     skip_update = false
   end
   
@@ -551,6 +633,17 @@ class Xonix97 < Gosu::Window
 
       if @player.update(@field.field_bmp)
         @field.flood_fill(@white_dots, @orange_lines)
+        percentage_complete = 100*@field.blue_count.to_f/TOTAL_SQUARES
+        @status_bar.update(:complete, "Complete: #{'%.1f' % percentage_complete}%")
+        # if percentage_complete > 75.0
+        #   @player.update_score
+        #   level_object_counts = @player.next_level
+
+        #   @field = Field.new
+        #   @white_dots = level_object_counts[:white_dots].times.map{ WhiteDot.new }
+        #   @black_dots = level_object_counts[:black_dots].times.map{ BlackDot.new }
+        #   @orange_lines = level_object_counts[:orange_lines].times.map{ OrangeLine.new }
+        # end
       end
 
       @white_dots.each do |w|
@@ -566,6 +659,14 @@ class Xonix97 < Gosu::Window
           l.update(@field.field_bmp)
         end
       end
+
+      mins = (Gosu::milliseconds/60000).to_i
+      secs = (Gosu::milliseconds - mins*60000)/1000
+      @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
+
+      # @player.interference?(@white_dots, @black_dots)
+      # @player.timeout?
+
     end
   end
   
@@ -587,12 +688,31 @@ class Xonix97 < Gosu::Window
       end
     end
 
-    # 1 frame = 17ms @60 FPS
-    if Gosu.fps < 59
-      @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
-      # puts "#{Gosu.fps} FPS"
-    end
+    @status_bar.draw
   end
 end
 
 Xonix97.new.show
+
+# score += 500; # at the end of the level
+# bonus = ((bonus_eligible) ? 10*MAX(0,((time_remaining)-(time_limit/2))/30) : 0)
+# # bonus_eligible is TRUE if never died on the level
+# score += bonus;
+
+# time_limit = (30*MIN(60*5,60*level))
+
+# if ((time_remaining < 31*30) # flashing
+#    sprintf(g_szBuffer,"%s   <<< Low Time!",g_szBuffer);
+
+# time_remaining = time_limit # at the beginning of the level
+# time_remaining -= 1 # every frame
+# # if death due to timeout, halve the time limit!
+# time_remaining = time_limit /= 2;
+
+#define MAXBDOTS 4
+#define MAXDOTS 8
+#define MAXLINES 4
+#define LEVEL2BDOTS(lev) MIN(MAXBDOTS,(1+(lev-1)/3))
+#define LEVEL2DOTS(lev) MIN(MAXDOTS,(3+lev/3))
+#define LEVEL2LINES(lev) MIN(MAXLINES,(lev+1)/3)
+
