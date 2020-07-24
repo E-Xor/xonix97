@@ -341,8 +341,6 @@ class Field
 
   def flood_fill(white_dots, orange_lines)
 
-    # t0 = Gosu::milliseconds
-
     # Replace red with blue
     FIELD_HEIGHT.times do |i|
       FIELD_WIDTH.times do |j|
@@ -354,9 +352,6 @@ class Field
 
       end
     end
-
-    # t1 = Gosu::milliseconds
-    # puts "t1: #{t1-t0}"
 
     # Each white dot and yellow line are starting points for the flood fill
     if orange_lines
@@ -422,9 +417,6 @@ class Field
       end
     end
 
-    # t2 = Gosu::milliseconds
-    # puts "t2: #{t2-t1}"
-
     # Replace Black with Blue and Checked with Black
     # Count fill % here
 
@@ -437,12 +429,9 @@ class Field
         end
 
         @field_bmp[i][j] = GameDefs::Black if @field_bmp[i][j] == GameDefs::Checked
-
       end
     end
 
-    # t3 = Gosu::milliseconds
-    # puts "t3: #{t3-t2}"
   end
 
   private
@@ -486,9 +475,9 @@ class Player
     @y = 3
     @image = Gosu::Image.new("#{MEDIA_DIR}/player.bmp")
 
-    @level = 1
     @score = 0
     @lives = 3
+    @died_on_this_level = false
   end
 
   def draw
@@ -566,6 +555,14 @@ class Player
     end
   end
 
+  def update_score(time_remaining, time_limit)
+    @score += 500
+    half_time_limit = time_limit/2
+    if !@died_on_this_level && time_remaining > time_limit/2
+      @score += (time_remaining - half_time_limit)/3
+    end
+  end
+
 end
 
 class StatusBar
@@ -616,34 +613,28 @@ class Xonix97 < Gosu::Window
 
     @field = Field.new
     @player = Player.new
-    @white_dots = 6.times.map{ WhiteDot.new }
-    @black_dots = 3.times.map{ BlackDot.new }
-    @orange_lines = 3.times.map{ OrangeLine.new }
     @status_bar = StatusBar.new
+
+    @level = 0
+    @time_remaining = 0
+    next_level
 
     skip_update = false
   end
   
   def update
-    # return
     @skip_update = !@skip_update # 30 FPS emulation
 
     unless @skip_update
       @skip_update = false
 
-      if @player.update(@field.field_bmp)
+      if @player.update(@field.field_bmp) # true if done cutting
         @field.flood_fill(@white_dots, @orange_lines)
-        percentage_complete = 100*@field.blue_count.to_f/TOTAL_SQUARES
+        percentage_complete = 100 * @field.blue_count.to_f / TOTAL_SQUARES
         @status_bar.update(:complete, "Complete: #{'%.1f' % percentage_complete}%")
-        # if percentage_complete > 75.0
-        #   @player.update_score
-        #   level_object_counts = @player.next_level
-
-        #   @field = Field.new
-        #   @white_dots = level_object_counts[:white_dots].times.map{ WhiteDot.new }
-        #   @black_dots = level_object_counts[:black_dots].times.map{ BlackDot.new }
-        #   @orange_lines = level_object_counts[:orange_lines].times.map{ OrangeLine.new }
-        # end
+        if percentage_complete > 75.0
+          next_level
+        end
       end
 
       @white_dots.each do |w|
@@ -660,12 +651,13 @@ class Xonix97 < Gosu::Window
         end
       end
 
-      mins = (Gosu::milliseconds/60000).to_i
-      secs = (Gosu::milliseconds - mins*60000)/1000
+      @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000 # sec, int
+      mins = @time_remaining/60
+      secs = @time_remaining - mins*60
       @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
 
-      # @player.interference?(@white_dots, @black_dots)
-      # @player.timeout?
+      # @player.interference?(@white_dots, @black_dots) # dies
+      # @player.timeout? # dies?
 
     end
   end
@@ -690,14 +682,38 @@ class Xonix97 < Gosu::Window
 
     @status_bar.draw
   end
+
+  def next_level
+    @player.update_score(@time_remaining, @time_limit) if @level > 0
+
+    if @level == 15
+      puts @score
+      exit
+    end
+
+    @level += 1
+    @time_limit = 180 * [5, @level].min
+    # unit test
+
+    @field = Field.new
+    @white_dots = [8, 3+@level/3].min.times.map{ WhiteDot.new }
+    @black_dots = [4, (1+(@level-1)/3)].min.times.map{ BlackDot.new }
+    @orange_lines = [4, (@level+1)/3].min.times.map{ OrangeLine.new }
+
+    # 1 - 3, 1, 0
+    # 2 - 
+    # 3 - 
+    # 15 - 
+    # unit test
+
+    # "Ready ..."
+    # sleep 2
+
+    @level_start_time = Gosu::milliseconds
+  end
 end
 
 Xonix97.new.show
-
-# score += 500; # at the end of the level
-# bonus = ((bonus_eligible) ? 10*MAX(0,((time_remaining)-(time_limit/2))/30) : 0)
-# # bonus_eligible is TRUE if never died on the level
-# score += bonus;
 
 # time_limit = (30*MIN(60*5,60*level))
 
@@ -709,10 +725,4 @@ Xonix97.new.show
 # # if death due to timeout, halve the time limit!
 # time_remaining = time_limit /= 2;
 
-#define MAXBDOTS 4
-#define MAXDOTS 8
-#define MAXLINES 4
-#define LEVEL2BDOTS(lev) MIN(MAXBDOTS,(1+(lev-1)/3))
-#define LEVEL2DOTS(lev) MIN(MAXDOTS,(3+lev/3))
-#define LEVEL2LINES(lev) MIN(MAXLINES,(lev+1)/3)
 
