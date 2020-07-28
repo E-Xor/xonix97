@@ -83,6 +83,29 @@ module GameDefs
   Red     = 2
   Checked = 10
   Border  = 20
+
+  def self.object_counts(level)
+    {
+      white_dots:   [8, 3 + level / 3].min,
+      black_dots:   [4, (1 + (level - 1) / 3)].min,
+      orange_lines: [4, (level + 1) / 3].min
+    }
+  end
+
+  def self.time_limit(level)
+    60 * [5, level].min
+  end
+
+  def self.bonus(time_remaining, time_limit, died_on_this_level)
+    half_time_limit = time_limit/2
+
+    if !died_on_this_level && time_remaining > half_time_limit
+      return 10 * (time_remaining - half_time_limit)
+    end
+
+    return 0
+  end
+
 end
 
 class Dot
@@ -557,10 +580,7 @@ class Player
 
   def update_score(time_remaining, time_limit)
     @score += 500
-    half_time_limit = time_limit/2
-    if !@died_on_this_level && time_remaining > time_limit/2
-      @score += (time_remaining - half_time_limit)/3
-    end
+    @score += GameDefs.bonus(time_remaining, time_limit, @died_on_this_level)
   end
 
 end
@@ -654,6 +674,12 @@ class Xonix97 < Gosu::Window
       @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000 # sec, int
       mins = @time_remaining/60
       secs = @time_remaining - mins*60
+      # bonus also ticks down, 10/sec
+      # level 1 - 60 sec, 300 bonus
+      # 2 - 120, 600
+      # 3 - 180, 900
+      # 4 - 240, 1200
+      # 5 and higher - 300, 1500
       @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
 
       # @player.interference?(@white_dots, @black_dots) # dies
@@ -692,19 +718,15 @@ class Xonix97 < Gosu::Window
     end
 
     @level += 1
-    @time_limit = 180 * [5, @level].min
+    # xonii += 1
+    @time_limit = GameDefs.time_limit(@level)
     # unit test
 
     @field = Field.new
-    @white_dots = [8, 3+@level/3].min.times.map{ WhiteDot.new }
-    @black_dots = [4, (1+(@level-1)/3)].min.times.map{ BlackDot.new }
-    @orange_lines = [4, (@level+1)/3].min.times.map{ OrangeLine.new }
-
-    # 1 - 3, 1, 0
-    # 2 - 
-    # 3 - 
-    # 15 - 
-    # unit test
+    counts = GameDefs.object_counts(@level)
+    @white_dots   = counts[:white_dots].times.map{ WhiteDot.new }
+    @black_dots   = counts[:black_dots].times.map{ BlackDot.new }
+    @orange_lines = counts[:orange_lines].times.map{ OrangeLine.new }
 
     # "Ready ..."
     # sleep 2
@@ -713,15 +735,14 @@ class Xonix97 < Gosu::Window
   end
 end
 
-Xonix97.new.show
+if __FILE__ == $0
+  Xonix97.new.show
+end
 
-# time_limit = (30*MIN(60*5,60*level))
-
-# if ((time_remaining < 31*30) # flashing
+# if ((time_remaining < 31) # showing the message every even second
 #    sprintf(g_szBuffer,"%s   <<< Low Time!",g_szBuffer);
 
 # time_remaining = time_limit # at the beginning of the level
-# time_remaining -= 1 # every frame
 # # if death due to timeout, halve the time limit!
 # time_remaining = time_limit /= 2;
 

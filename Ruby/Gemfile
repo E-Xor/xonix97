@@ -1,3 +1,4 @@
 source "https://rubygems.org"
 
 gem 'gosu', '~> 0.15.2'
+gem 'test-unit', '~> 3.3.6'
