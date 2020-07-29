@@ -62,12 +62,13 @@ class TextXonix97 < Test::Unit::TestCase
     assert_equal(x.instance_variable_get(:@white_dots).count, 3)
     assert_equal(x.instance_variable_get(:@black_dots).count, 1)
     assert_equal(x.instance_variable_get(:@orange_lines).count, 0)
+    assert_equal(x.instance_variable_get(:@time_limit), 60)
 
     x.next_level
     assert_equal(x.instance_variable_get(:@level), 2)
     assert_equal(x.instance_variable_get(:@white_dots).count, 3)
     assert_equal(x.instance_variable_get(:@black_dots).count, 1)
     assert_equal(x.instance_variable_get(:@orange_lines).count, 1)
+    assert_equal(x.instance_variable_get(:@time_limit), 120)
   end
 end
-

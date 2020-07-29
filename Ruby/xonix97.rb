@@ -486,21 +486,27 @@ class Field
 end
 
 class Player
+  attr_reader :score, :lives
+
   SIZE = 7
   OFFSET = 3
   SPEED = 4
   Z_ORDER = 10
 
   def initialize
-    @x_speed = 0
-    @y_speed = 0
-    @x = 251 # FIELD_WIDTH / 2
-    @y = 3
+    reset_position
     @image = Gosu::Image.new("#{MEDIA_DIR}/player.bmp")
 
     @score = 0
     @lives = 3
     @died_on_this_level = false
+  end
+
+  def reset_position
+    @x_speed = 0
+    @y_speed = 0
+    @x = 251 # FIELD_WIDTH / 2
+    @y = 3
   end
 
   def draw
@@ -589,34 +595,41 @@ class StatusBar
   Z_ORDER = 20
   STRETCH = 0.8
 
-  # "Level:%d   Xonii:%d   Score:%d   Filled:%4.1f%%   Bonus:%d   Time:%d"
+  # 
   def initialize
     @font = Gosu::Font.new(15) # font size
-    @status_bar_messages = {
-      complete: {
-        message: "Filled: 18.0%"
-      },
-      time: {
-        message: "Time: 0:00"
-      },
-      score: { 
-        message: "Score: 0"
-      }
-    }
+    @status_bar_messages = 'Level:%d   Xonii:%d   Score:%d   Filled:%4.1f%%   Bonus:%d   Time: %3d:%02d'
+    #{'%3d' % mins}:#{'%02d' % secs}
+    # @status_bar_messages = {
+    #   complete: {
+    #     message: "Filled: 18.0%"
+    #   },
+    #   time: {
+    #     message: "Time: 0:00"
+    #   },
+    #   score: { 
+    #     message: "Score: 0"
+    #   }
+    # }
   end
 
-  def update(message_key, message_text)
-    @status_bar_messages[message_key] = {
-      message: message_text
-    }
-  end
+  # def update(message_key, message_text)
+  #   @status_bar_messages[message_key] = {
+  #     message: message_text
+  #   }
+  # end
 
-  def draw
-    text_position = 10
-    @status_bar_messages.each_value do |m|
-      @font.draw_text(m[:message], text_position, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
-      text_position += m[:message].length * 8 + 15
-    end
+  def draw(level, xonii, score, filled, bonus, time)
+    # text_position = 10
+    # @status_bar_messages.each_value do |m|
+    #   @font.draw_text(m[:message], text_position, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
+    #   text_position += m[:message].length * 8 + 15
+    # end
+
+    mins = time/60
+    secs = time - mins*60
+    status_bar_with_messages = @status_bar_messages % [level, xonii, score, filled, bonus, mins, secs]
+    @font.draw_text(status_bar_with_messages, 10, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
 
     if Gosu.fps < 59 && FPS_DEBUG
       @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
@@ -637,8 +650,10 @@ class Xonix97 < Gosu::Window
 
     @level = 0
     @time_remaining = 0
+    @percentage_complete = 18
     next_level
 
+    @center_message_font = Gosu::Font.new(15)
     skip_update = false
   end
   
@@ -648,11 +663,17 @@ class Xonix97 < Gosu::Window
     unless @skip_update
       @skip_update = false
 
+      if @show_ready
+        @show_ready = false
+        sleep 2
+        @level_start_time = Gosu::milliseconds
+      end
+
       if @player.update(@field.field_bmp) # true if done cutting
         @field.flood_fill(@white_dots, @orange_lines)
-        percentage_complete = 100 * @field.blue_count.to_f / TOTAL_SQUARES
-        @status_bar.update(:complete, "Complete: #{'%.1f' % percentage_complete}%")
-        if percentage_complete > 75.0
+        @percentage_complete = 100 * @field.blue_count.to_f / TOTAL_SQUARES
+        # @status_bar.update(:complete, "Complete: #{'%.1f' % percentage_complete}%")
+        if @percentage_complete > 75.0
           next_level
         end
       end
@@ -672,15 +693,13 @@ class Xonix97 < Gosu::Window
       end
 
       @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000 # sec, int
-      mins = @time_remaining/60
-      secs = @time_remaining - mins*60
       # bonus also ticks down, 10/sec
       # level 1 - 60 sec, 300 bonus
       # 2 - 120, 600
       # 3 - 180, 900
       # 4 - 240, 1200
       # 5 and higher - 300, 1500
-      @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
+      # @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
 
       # @player.interference?(@white_dots, @black_dots) # dies
       # @player.timeout? # dies?
@@ -706,21 +725,25 @@ class Xonix97 < Gosu::Window
       end
     end
 
-    @status_bar.draw
+    @status_bar.draw(@level, @player.lives, @player.score, @percentage_complete, 0, @time_remaining)
+
+    if @show_ready
+      @center_message_font.draw_text('Ready ...', FIELD_WIDTH/3, FIELD_HEIGHT/2 - 10, 11)
+    end
   end
 
   def next_level
     @player.update_score(@time_remaining, @time_limit) if @level > 0
+    @player.reset_position
 
     if @level == 15
-      puts @score
+      puts Player.score
       exit
     end
 
     @level += 1
     # xonii += 1
     @time_limit = GameDefs.time_limit(@level)
-    # unit test
 
     @field = Field.new
     counts = GameDefs.object_counts(@level)
@@ -728,10 +751,7 @@ class Xonix97 < Gosu::Window
     @black_dots   = counts[:black_dots].times.map{ BlackDot.new }
     @orange_lines = counts[:orange_lines].times.map{ OrangeLine.new }
 
-    # "Ready ..."
-    # sleep 2
-
-    @level_start_time = Gosu::milliseconds
+    @show_ready = true
   end
 end
 
