@@ -1,8 +1,10 @@
 # Xonix97
 
-Based on the Xonix32 made originally for Windows95. All inspired by the original DOS Xonix.
+Based on the Xonix32 introduced in 1997 for Windows 95 and inspired by the original DOS Xonix.
 
-The main difference between Xonix32 and original Xonix is moving orange-yellow lines that paint back the field.
+The main difference between Xonix32 and original Xonix is moving orange lines that paint back the field.
+
+This version also allows red line to selve-intersect. I think it was not allowed originally to keep Flood Fill faster.
 
 ## Why
 
@@ -27,3 +29,21 @@ Ability to play around with the code helped a lot to understand the approach as 
 ## What's up with the folder structure?
 
 Ruby code goes into binary and binary goes into Mac/OS X App. Currently using rubyc for binary creating and Platypus for the app. That folder structure makes it easier to manipulate all these transformations.
+
+## Gosu
+
+```
+brew install sdl2
+gem install gosu # In Gemfile
+```
+
+## Ruby Packer
+
+```
+brew install squashfs
+# Install Command Line Tools from https://developer.apple.com/download/more/
+curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
+chmod +x rubyc
+./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97src/Ruby ./xonix97src/Ruby/xonix97.rb
+# https://github.com/pmq20/ruby-packer/issues/39
+```

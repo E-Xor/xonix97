@@ -1,21 +1,8 @@
 #!/usr/bin/env ruby
 
-# Xonix game based on Xonix32 introduced in 1997 for Windows 95.
-# The main difference to the DOS Xonix is orange line that paints back the field.
-# This version also allows red line to selve-intersect.
-# I think it was not allowed originally to keep Flood Fill faster.
-
-# brew install sdl2
-# gem install gosu
-
-# https://github.com/pmq20/ruby-packer
-# brew install squashfs
-# Install Command Line Tools from https://developer.apple.com/download/more/
-# curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
-# chmod +x rubyc
-# ./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97src/Ruby ./xonix97src/Ruby/xonix97.rb
-# https://github.com/pmq20/ruby-packer/issues/39
-# https://github.com/danistefanovic/build-your-own-x#build-your-own-game
+require 'rubygems'
+require 'bundler/setup'
+require 'gosu'
 
 # 1 frame = 17ms @60 FPS
 
@@ -67,14 +54,10 @@
 
 MEDIA_DIR = `pwd`.chomp + '/../Resources' # not __dir__, when compiled into binary code it has differenent return compared to pwd
 
-require 'rubygems'
-require 'bundler/setup'
-require 'gosu'
-
 FIELD_WIDTH, FIELD_HEIGHT = 510, 322
 TOTAL_SQUARES = FIELD_WIDTH * FIELD_HEIGHT
-# WIDTH, HEIGHT = FIELD_WIDTH + 200, FIELD_HEIGHT
-WIDTH, HEIGHT = FIELD_WIDTH, FIELD_HEIGHT + 25
+WIDTH, HEIGHT = FIELD_WIDTH, FIELD_HEIGHT + 25 # 25 is for status bar
+
 FPS_DEBUG = true
 
 module GameDefs
@@ -92,8 +75,11 @@ module GameDefs
     }
   end
 
-  def self.time_limit(level)
-    60 * [5, level].min
+  def self.time_limit(level, died_on_this_level)
+    limit = 60 * [5, level].min
+    limit /= 2 if died_on_this_level
+
+    limit
   end
 
   def self.bonus(time_remaining, time_limit, died_on_this_level)
@@ -457,6 +443,24 @@ class Field
 
   end
 
+  def interference?(white_dots)
+    white_dots.each do |w|
+      return true if @field_bmp[w.y][w.x] == GameDefs::Red
+    end
+
+    return false
+  end
+
+  def clean_red
+    FIELD_HEIGHT.times do |i|
+      FIELD_WIDTH.times do |j|
+        if @field_bmp[i][j] == GameDefs::Red
+          @field_bmp[i][j] = GameDefs::Black
+        end
+      end
+    end
+  end
+
   private
 
   def draw_pieces(field_bit, filed_color)
@@ -486,25 +490,26 @@ class Field
 end
 
 class Player
-  attr_reader :score, :lives
+  attr_reader   :score
+  attr_accessor :xonii, :died_on_this_level
 
-  SIZE = 7
+  COLLISION = 5
   OFFSET = 3
   SPEED = 4
   Z_ORDER = 10
 
   def initialize
-    reset_position
     @image = Gosu::Image.new("#{MEDIA_DIR}/player.bmp")
 
     @score = 0
-    @lives = 3
+    @xonii = 2
     @died_on_this_level = false
   end
 
   def reset_position
     @x_speed = 0
     @y_speed = 0
+
     @x = 251 # FIELD_WIDTH / 2
     @y = 3
   end
@@ -519,8 +524,7 @@ class Player
   end
 
   def move(field_bmp)
-    # check before move
-    # check the speed direction too, allow to move away from the edge
+    # check edges before move
     if (@x_speed < 0 && @x - OFFSET <= 1) || (@x_speed > 0 && @x + OFFSET >= FIELD_WIDTH - 3)
       @x_speed = 0
     end
@@ -547,22 +551,10 @@ class Player
     end
 
     # End of red path
-    begin
-      if field_bmp[@y][@x] == GameDefs::Blue && (field_bmp[@y - @y_speed][@x - @x_speed] == GameDefs::Red)
-        @x_speed = 0
-        @y_speed = 0
-        return true
-      else
-        return nil
-      end
-    rescue => e
-      puts @x
-      puts @y
-      puts @x_speed
-      puts @y_speed
-      puts @x - @x_speed
-      puts @y - @y_speed
-      raise e
+    if field_bmp[@y][@x] == GameDefs::Blue && (field_bmp[@y - @y_speed][@x - @x_speed] == GameDefs::Red)
+      @x_speed = 0
+      @y_speed = 0
+      return true
     end
 
     return nil
@@ -589,53 +581,43 @@ class Player
     @score += GameDefs.bonus(time_remaining, time_limit, @died_on_this_level)
   end
 
+  def interference?(white_dots, black_dots)
+    white_dots.each do |w|
+      return true if (w.x - @x).abs + (w.y - @y).abs <= COLLISION
+    end
+
+    black_dots.each do |b|
+      return true if (b.x - @x).abs + (b.y - @y).abs <= COLLISION
+    end
+
+    return false
+  end
+
 end
 
 class StatusBar
   Z_ORDER = 20
   STRETCH = 0.8
 
-  # 
   def initialize
     @font = Gosu::Font.new(15) # font size
-    @status_bar_messages = 'Level:%d   Xonii:%d   Score:%d   Filled:%4.1f%%   Bonus:%d   Time: %3d:%02d'
-    #{'%3d' % mins}:#{'%02d' % secs}
-    # @status_bar_messages = {
-    #   complete: {
-    #     message: "Filled: 18.0%"
-    #   },
-    #   time: {
-    #     message: "Time: 0:00"
-    #   },
-    #   score: { 
-    #     message: "Score: 0"
-    #   }
-    # }
+    @status_bar_messages = 'Level: %d   Xonii: %d   Filled: %4.1f%%   Score: %d   Time: %1d:%02d'
+    @sbm_time_warn       = 'Level: %d   Xonii: %d   Filled: %4.1f%%   Score: %d   <b>Time:%1d:%02d</b>'
   end
 
-  # def update(message_key, message_text)
-  #   @status_bar_messages[message_key] = {
-  #     message: message_text
-  #   }
-  # end
-
-  def draw(level, xonii, score, filled, bonus, time)
-    # text_position = 10
-    # @status_bar_messages.each_value do |m|
-    #   @font.draw_text(m[:message], text_position, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
-    #   text_position += m[:message].length * 8 + 15
-    # end
-
+  def draw(level, xonii, score, filled, time)
     mins = time/60
     secs = time - mins*60
-    status_bar_with_messages = @status_bar_messages % [level, xonii, score, filled, bonus, mins, secs]
-    @font.draw_text(status_bar_with_messages, 10, FIELD_HEIGHT + 5, Z_ORDER) # text, x, y, z, x stretch, y stretch
-
+    if mins == 0 && secs <= 30 && secs.even?
+      @font.draw_markup(@sbm_time_warn % [level, xonii, filled, score, mins, secs], 10, FIELD_HEIGHT + 5, Z_ORDER)
+    else
+      @font.draw_text(@status_bar_messages % [level, xonii, filled, score, mins, secs], 10, FIELD_HEIGHT + 5, Z_ORDER) 
+    end
     if Gosu.fps < 59 && FPS_DEBUG
       @font.draw_text("#{Gosu.fps} FPS", 5, 5, 11)
     end
-
   end
+
 end
 
 class Xonix97 < Gosu::Window
@@ -644,23 +626,23 @@ class Xonix97 < Gosu::Window
     
     self.caption = "Xonix97"
 
-    @field = Field.new
     @player = Player.new
     @status_bar = StatusBar.new
 
     @level = 0
-    @time_remaining = 0
-    @percentage_complete = 18
+
     next_level
 
-    @center_message_font = Gosu::Font.new(15)
-    skip_update = false
+    @center_message_font = Gosu::Font.new(20)
+
+    @show_score = false
+    @skip_update = false
   end
   
   def update
     @skip_update = !@skip_update # 30 FPS emulation
 
-    unless @skip_update
+    if !@skip_update && !@show_score
       @skip_update = false
 
       if @show_ready
@@ -672,7 +654,7 @@ class Xonix97 < Gosu::Window
       if @player.update(@field.field_bmp) # true if done cutting
         @field.flood_fill(@white_dots, @orange_lines)
         @percentage_complete = 100 * @field.blue_count.to_f / TOTAL_SQUARES
-        # @status_bar.update(:complete, "Complete: #{'%.1f' % percentage_complete}%")
+
         if @percentage_complete > 75.0
           next_level
         end
@@ -692,22 +674,40 @@ class Xonix97 < Gosu::Window
         end
       end
 
-      @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000 # sec, int
-      # bonus also ticks down, 10/sec
-      # level 1 - 60 sec, 300 bonus
-      # 2 - 120, 600
-      # 3 - 180, 900
-      # 4 - 240, 1200
-      # 5 and higher - 300, 1500
-      # @status_bar.update(:time, "Time: #{'%3d' % mins}:#{'%02d' % secs}")
+      @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000
 
-      # @player.interference?(@white_dots, @black_dots) # dies
-      # @player.timeout? # dies?
+      # Death
+      if @player.interference?(@white_dots, @black_dots) || @field.interference?(@white_dots) || @time_remaining <= 0
+        sleep 2
 
+        @player.xonii -= 1
+
+        if @player.xonii == 0
+          @show_score = true
+        else
+          @player.died_on_this_level = true
+          @player.reset_position
+          @field.clean_red
+
+          @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
+
+          @show_ready = true
+        end
+      end
+
+    end
+
+    if @show_score && (Gosu.button_down?(Gosu::KB_ESCAPE) || Gosu.button_down?(Gosu::KB_SPACE) || Gosu.button_down?(Gosu::MS_LEFT))
+      exit
     end
   end
   
   def draw
+    if @show_score
+      @center_message_font.draw_text("Your score is #{@player.score}",
+        FIELD_WIDTH/3, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
+    end
+
     @field.draw
     @player.draw
 
@@ -725,10 +725,10 @@ class Xonix97 < Gosu::Window
       end
     end
 
-    @status_bar.draw(@level, @player.lives, @player.score, @percentage_complete, 0, @time_remaining)
+    @status_bar.draw(@level, @player.xonii, @player.score, @percentage_complete, @time_remaining)
 
     if @show_ready
-      @center_message_font.draw_text('Ready ...', FIELD_WIDTH/3, FIELD_HEIGHT/2 - 10, 11)
+      @center_message_font.draw_text('Ready...', FIELD_WIDTH/3 + 50, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
     end
   end
 
@@ -737,13 +737,12 @@ class Xonix97 < Gosu::Window
     @player.reset_position
 
     if @level == 15
-      puts Player.score
-      exit
+      @show_score = true
     end
 
     @level += 1
-    # xonii += 1
-    @time_limit = GameDefs.time_limit(@level)
+    @player.xonii += 1
+    @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
 
     @field = Field.new
     counts = GameDefs.object_counts(@level)
@@ -751,19 +750,31 @@ class Xonix97 < Gosu::Window
     @black_dots   = counts[:black_dots].times.map{ BlackDot.new }
     @orange_lines = counts[:orange_lines].times.map{ OrangeLine.new }
 
+    @time_remaining = @time_limit
+    @percentage_complete = 18
+
     @show_ready = true
   end
+
 end
 
 if __FILE__ == $0
   Xonix97.new.show
 end
 
-# if ((time_remaining < 31) # showing the message every even second
-#    sprintf(g_szBuffer,"%s   <<< Low Time!",g_szBuffer);
-
 # time_remaining = time_limit # at the beginning of the level
 # # if death due to timeout, halve the time limit!
 # time_remaining = time_limit /= 2;
+# make a test
+
+# Black dot should bounce of red field
+
+# I think time per level is off
+
+# Time blinkis odd
+
+# Colons in status bar are weird
+
+# Time is old during Ready ...
 
 
