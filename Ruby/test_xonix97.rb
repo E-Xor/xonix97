@@ -23,35 +23,45 @@ class TestGameDefs < Test::Unit::TestCase
   end
 
   def test_time_limit
-    assert_equal(GameDefs.time_limit(1),  60)
-    assert_equal(GameDefs.time_limit(2),  120)
-    assert_equal(GameDefs.time_limit(3),  180)
-    assert_equal(GameDefs.time_limit(4),  240)
-    assert_equal(GameDefs.time_limit(5),  300)
-    assert_equal(GameDefs.time_limit(6),  300)
-    assert_equal(GameDefs.time_limit(15), 300)
+    assert_equal(GameDefs.time_limit(1, false),  60)
+    assert_equal(GameDefs.time_limit(2, false),  120)
+    assert_equal(GameDefs.time_limit(3, false),  180)
+    assert_equal(GameDefs.time_limit(4, false),  240)
+    assert_equal(GameDefs.time_limit(5, false),  300)
+    assert_equal(GameDefs.time_limit(6, false),  300)
+    assert_equal(GameDefs.time_limit(15, false), 300)
+  end
+
+  def test_time_limit_after_death
+    assert_equal(GameDefs.time_limit(1, true),  30)
+    assert_equal(GameDefs.time_limit(2, true),  60)
+    assert_equal(GameDefs.time_limit(3, true),  90)
+    assert_equal(GameDefs.time_limit(4, true),  120)
+    assert_equal(GameDefs.time_limit(5, true),  150)
+    assert_equal(GameDefs.time_limit(6, true),  150)
+    assert_equal(GameDefs.time_limit(15, true), 150)
   end
 
   def test_bonus
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(1), GameDefs.time_limit(1), false),  300)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(1), GameDefs.time_limit(1), true),  0)
-    assert_equal(GameDefs.bonus(45, GameDefs.time_limit(1), false),  150)
-    assert_equal(GameDefs.bonus(31, GameDefs.time_limit(1), false),  10)
-    assert_equal(GameDefs.bonus(30, GameDefs.time_limit(1), false),  0)
-    assert_equal(GameDefs.bonus(15, GameDefs.time_limit(1), false),  0)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(1, false), GameDefs.time_limit(1, false), false),  300)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(1, true), GameDefs.time_limit(1, true), true),  0)
+    assert_equal(GameDefs.bonus(45, GameDefs.time_limit(1, false), false),  150)
+    assert_equal(GameDefs.bonus(31, GameDefs.time_limit(1, false), false),  10)
+    assert_equal(GameDefs.bonus(30, GameDefs.time_limit(1, false), false),  0)
+    assert_equal(GameDefs.bonus(15, GameDefs.time_limit(1, false), false),  0)
 
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(2), GameDefs.time_limit(2), false),  600)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(3), GameDefs.time_limit(3), false),  900)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(4), GameDefs.time_limit(4), false),  1200)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(5), GameDefs.time_limit(5), false),  1500)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(6), GameDefs.time_limit(6), false),  1500)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(2, false), GameDefs.time_limit(2, false), false),  600)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(3, false), GameDefs.time_limit(3, false), false),  900)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(4, false), GameDefs.time_limit(4, false), false),  1200)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(5, false), GameDefs.time_limit(5, false), false),  1500)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(6, false), GameDefs.time_limit(6, false), false),  1500)
 
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(15), GameDefs.time_limit(15), false), 1500)
-    assert_equal(GameDefs.bonus(GameDefs.time_limit(15), GameDefs.time_limit(15), true), 0)
-    assert_equal(GameDefs.bonus(250, GameDefs.time_limit(15), false), 1000)
-    assert_equal(GameDefs.bonus(151, GameDefs.time_limit(15), false), 10)
-    assert_equal(GameDefs.bonus(150, GameDefs.time_limit(15), false), 0)
-    assert_equal(GameDefs.bonus(100, GameDefs.time_limit(15), false), 0)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(15, false), GameDefs.time_limit(15, false), false), 1500)
+    assert_equal(GameDefs.bonus(GameDefs.time_limit(15, true), GameDefs.time_limit(15, true), true), 0)
+    assert_equal(GameDefs.bonus(250, GameDefs.time_limit(15, false), false), 1000)
+    assert_equal(GameDefs.bonus(151, GameDefs.time_limit(15, false), false), 10)
+    assert_equal(GameDefs.bonus(150, GameDefs.time_limit(15, false), false), 0)
+    assert_equal(GameDefs.bonus(100, GameDefs.time_limit(15, false), false), 0)
   end
 end
 

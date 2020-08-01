@@ -122,11 +122,11 @@ class Dot
 
   def bounce(field_bmp)
 
-    if y_border || next_pix_y(field_bmp) == @bounce_pix 
+    if y_border || next_pix_y(field_bmp) == @bounce_pix || (@bounce_pix_2 && next_pix_y(field_bmp) == @bounce_pix_2)
       @y_speed = -@y_speed
     end
 
-    if x_border || next_pix_x(field_bmp) == @bounce_pix
+    if x_border || next_pix_x(field_bmp) == @bounce_pix || (@bounce_pix_2 && next_pix_x(field_bmp) == @bounce_pix_2)
       @x_speed = -@x_speed
     end
 
@@ -153,7 +153,7 @@ class Dot
 
     if next_y
       pix = next_y[@x]
-    else 
+    else
       pix = @bounce_pix
     end
     pix
@@ -190,7 +190,9 @@ end
 
 class WhiteDot < Dot
   def initialize
-    @bounce_pix = GameDefs::Blue
+    @bounce_pix   = GameDefs::Blue
+    @bounce_pix_2 = false
+
     @image = Gosu::Image.new("#{MEDIA_DIR}/wdot.png")
     @x_speed = rand(2) + 1
     @y_speed = rand(2) + 1
@@ -201,7 +203,9 @@ end
 
 class BlackDot < Dot
   def initialize
-    @bounce_pix = GameDefs::Black # and Red
+    @bounce_pix   = GameDefs::Black
+    @bounce_pix_2 = GameDefs::Red
+
     @image = Gosu::Image.new("#{MEDIA_DIR}/bdot.png")
 
     @x_speed = 2
@@ -216,6 +220,7 @@ end
 class LineDot < Dot
   def initialize
     @bounce_pix = GameDefs::Blue
+    @bounce_pix_2 = false
 
     @x_speed = 1
     @y_speed = 1
@@ -493,7 +498,7 @@ class Player
   attr_reader   :score
   attr_accessor :xonii, :died_on_this_level
 
-  COLLISION = 5
+  COLLISION = 1
   OFFSET = 3
   SPEED = 4
   Z_ORDER = 10
@@ -538,14 +543,8 @@ class Player
 
     (@x - OFFSET .. @x + OFFSET).each do |j|
       (@y - OFFSET .. @y + OFFSET).each do |i|
-        begin
-          if field_bmp[i] && field_bmp[i][j] == GameDefs::Black
-            field_bmp[i][j] = GameDefs::Red
-          end
-        rescue => e
-          puts i
-          puts j
-          raise e
+        if field_bmp[i] && field_bmp[i][j] == GameDefs::Black
+          field_bmp[i][j] = GameDefs::Red
         end
       end
     end
@@ -601,8 +600,8 @@ class StatusBar
 
   def initialize
     @font = Gosu::Font.new(15) # font size
-    @status_bar_messages = 'Level: %d   Xonii: %d   Filled: %4.1f%%   Score: %d   Time: %1d:%02d'
-    @sbm_time_warn       = 'Level: %d   Xonii: %d   Filled: %4.1f%%   Score: %d   <b>Time:%1d:%02d</b>'
+    @status_bar_messages = 'Level: %d    Xonii: %d    Filled: %4.1f%%    Score: %d    Time: %1d:%02d'
+    @sbm_time_warn       = 'Level: %d    Xonii: %d    Filled: %4.1f%%    Score: %d    <b>Time:%1d:%02d   <<< Low Time!</b>'
   end
 
   def draw(level, xonii, score, filled, time)
@@ -649,6 +648,8 @@ class Xonix97 < Gosu::Window
         @show_ready = false
         sleep 2
         @level_start_time = Gosu::milliseconds
+      else
+        @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000
       end
 
       if @player.update(@field.field_bmp) # true if done cutting
@@ -674,9 +675,6 @@ class Xonix97 < Gosu::Window
         end
       end
 
-      @time_remaining = @time_limit - (Gosu::milliseconds - @level_start_time)/1000
-
-      # Death
       if @player.interference?(@white_dots, @black_dots) || @field.interference?(@white_dots) || @time_remaining <= 0
         sleep 2
 
@@ -690,6 +688,7 @@ class Xonix97 < Gosu::Window
           @field.clean_red
 
           @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
+          @time_remaining = @time_limit
 
           @show_ready = true
         end
@@ -704,8 +703,8 @@ class Xonix97 < Gosu::Window
   
   def draw
     if @show_score
-      @center_message_font.draw_text("Your score is #{@player.score}",
-        FIELD_WIDTH/3, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
+      @center_message_font.draw_text("     Game over\n\nYour score is #{@player.score}",
+        FIELD_WIDTH/3 + 10, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
     end
 
     @field.draw
@@ -735,6 +734,7 @@ class Xonix97 < Gosu::Window
   def next_level
     @player.update_score(@time_remaining, @time_limit) if @level > 0
     @player.reset_position
+    @player.died_on_this_level = false
 
     if @level == 15
       @show_score = true
@@ -743,15 +743,14 @@ class Xonix97 < Gosu::Window
     @level += 1
     @player.xonii += 1
     @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
+    @time_remaining = @time_limit
+    @percentage_complete = 18
 
     @field = Field.new
     counts = GameDefs.object_counts(@level)
     @white_dots   = counts[:white_dots].times.map{ WhiteDot.new }
     @black_dots   = counts[:black_dots].times.map{ BlackDot.new }
     @orange_lines = counts[:orange_lines].times.map{ OrangeLine.new }
-
-    @time_remaining = @time_limit
-    @percentage_complete = 18
 
     @show_ready = true
   end
@@ -762,19 +761,5 @@ if __FILE__ == $0
   Xonix97.new.show
 end
 
-# time_remaining = time_limit # at the beginning of the level
-# # if death due to timeout, halve the time limit!
-# time_remaining = time_limit /= 2;
-# make a test
-
-# Black dot should bounce of red field
-
-# I think time per level is off
-
-# Time blinkis odd
-
-# Colons in status bar are weird
-
-# Time is old during Ready ...
-
+# Thin red line on the border visual bug and lost life
 
