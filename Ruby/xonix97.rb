@@ -498,7 +498,7 @@ class Player
   attr_reader   :score
   attr_accessor :xonii, :died_on_this_level
 
-  COLLISION = 1
+  COLLISION = 4
   OFFSET = 3
   SPEED = 4
   Z_ORDER = 10
@@ -541,10 +541,10 @@ class Player
     @x += @x_speed
     @y += @y_speed
 
-    (@x - OFFSET .. @x + OFFSET).each do |j|
-      (@y - OFFSET .. @y + OFFSET).each do |i|
-        if field_bmp[i] && field_bmp[i][j] == GameDefs::Black
-          field_bmp[i][j] = GameDefs::Red
+    if field_bmp[@y] && field_bmp[@y][@x] == GameDefs::Black
+      (@x - OFFSET .. @x + OFFSET).each do |j|
+        (@y - OFFSET .. @y + OFFSET).each do |i|
+          field_bmp[i][j] = GameDefs::Red if field_bmp[i] && field_bmp[i][j] == GameDefs::Black
         end
       end
     end
@@ -629,13 +629,13 @@ class Xonix97 < Gosu::Window
     @status_bar = StatusBar.new
 
     @level = 0
-
     next_level
 
-    @center_message_font = Gosu::Font.new(20)
-
+    @congrats = false
     @show_score = false
     @skip_update = false
+
+    @center_message_font = Gosu::Font.new(20)
   end
   
   def update
@@ -696,15 +696,26 @@ class Xonix97 < Gosu::Window
 
     end
 
-    if @show_score && (Gosu.button_down?(Gosu::KB_ESCAPE) || Gosu.button_down?(Gosu::KB_SPACE) || Gosu.button_down?(Gosu::MS_LEFT))
+    if @show_score && (
+        Gosu.button_down?(Gosu::KB_ESCAPE) ||
+        Gosu.button_down?(Gosu::KB_SPACE) ||
+        Gosu.button_down?(Gosu::MS_LEFT) ||
+        Gosu.button_down?(Gosu::KB_ENTER) ||
+        Gosu.button_down?(Gosu::KB_RETURN)
+      )
       exit
     end
   end
   
   def draw
-    if @show_score
-      @center_message_font.draw_text("     Game over\n\nYour score is #{@player.score}",
-        FIELD_WIDTH/3 + 10, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
+    if @congrats
+      @center_message_font.draw_text("Congratulations!!!\n\nYour score is #{@player.score}",
+        50, FIELD_HEIGHT/2 - 100, 11, 1, 1, Gosu::Color::YELLOW)
+    elsif @show_score
+      @center_message_font.draw_text("Game over\n\nYour score is #{@player.score}",
+        50 + 10, FIELD_HEIGHT/2 - 100, 11, 1, 1, Gosu::Color::YELLOW)
+    elsif @show_ready
+      @center_message_font.draw_text('Ready...', FIELD_WIDTH/3 + 50, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
     end
 
     @field.draw
@@ -725,10 +736,6 @@ class Xonix97 < Gosu::Window
     end
 
     @status_bar.draw(@level, @player.xonii, @player.score, @percentage_complete, @time_remaining)
-
-    if @show_ready
-      @center_message_font.draw_text('Ready...', FIELD_WIDTH/3 + 50, FIELD_HEIGHT/2 - 10, 11, 1, 1, Gosu::Color::YELLOW)
-    end
   end
 
   def next_level
@@ -737,7 +744,9 @@ class Xonix97 < Gosu::Window
     @player.died_on_this_level = false
 
     if @level == 15
+      @congrats = true
       @show_score = true
+      return
     end
 
     @level += 1
@@ -761,5 +770,5 @@ if __FILE__ == $0
   Xonix97.new.show
 end
 
-# Thin red line on the border visual bug and lost life
 
+# Test, Polish, Pack, Video
