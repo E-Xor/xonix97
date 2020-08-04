@@ -44,6 +44,30 @@ brew install squashfs
 # Install Command Line Tools from https://developer.apple.com/download/more/
 curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
 chmod +x rubyc
-./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97src/Ruby ./xonix97src/Ruby/xonix97.rb
+./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97/Ruby ./xonix97/Ruby/xonix97.rb
 # https://github.com/pmq20/ruby-packer/issues/39
 ```
+
+## Mac OS / OS X App
+
+* Take Xonix97.out from the previous step and put in Resource folder. `mv Xonix97.out xonix97/Resources/Xonix97`
+* Test `cd xonix97/Resources; ./Xonix97`
+* Install Platypus app.
+* Create a new shell script app.
+  * App Name: Xonix97
+  * Icon -> "Select .icns File...": xonix97/Resources/AppIcon.icns
+  * Script Type: Shell
+  * Script Path: /path/to/xonix97/launch_xonix.sh
+  * Interface: Text Window
+  * Identifier: com.apple.Xonix97
+  * Author: Maksim Sundukov
+  * Version: 1.0
+  * Check: Remain running after execution
+  * Uncheck: Run with root priveleges
+  * Uncheck: Run in background
+  * Uncheck: Accept dropped items
+  * Bundled Files: add everything from xonix97/Resources/
+  * Create App -> Save As: Xonix97.app
+* Double-click Xonix97.app or move into Applications
+* Enjoy!
+
