@@ -4,7 +4,7 @@ require 'rubygems'
 require 'bundler/setup'
 require 'gosu'
 
-# 1 frame = 17ms @60 FPS
+
 
 # puts "__dir__ :#{__dir__}"
 # puts
@@ -58,7 +58,7 @@ FIELD_WIDTH, FIELD_HEIGHT = 510, 322
 TOTAL_SQUARES = FIELD_WIDTH * FIELD_HEIGHT
 WIDTH, HEIGHT = FIELD_WIDTH, FIELD_HEIGHT + 25 # 25 is for status bar
 
-FPS_DEBUG = true
+FPS_DEBUG = false
 
 module GameDefs
   Blue    = 0
@@ -96,9 +96,10 @@ end
 
 class Dot
   attr_reader :x, :y, :x_speed, :y_speed
-  OFFSET = 3
+
+  OFFSET  = 3
   Z_ORDER = 4
-  GAP = 50
+  GAP     = 50
 
   def initialize(x: nil, y: nil)
 
@@ -189,6 +190,7 @@ class Dot
 end
 
 class WhiteDot < Dot
+
   def initialize
     @bounce_pix   = GameDefs::Blue
     @bounce_pix_2 = false
@@ -231,7 +233,8 @@ end
 
 class OrangeLine
   attr_reader :end_one, :end_two
-  ORANGE = Gosu::Color.rgba(132, 132, 0, 255)
+
+  ORANGE  = Gosu::Color.rgba(132, 132, 0, 255)
   Z_ORDER = 3
 
   def initialize
@@ -249,9 +252,10 @@ class OrangeLine
   def draw
     # Draws fat line taking rectangular and rotating it
 
-    angle = Gosu.angle(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
+    angle  = Gosu.angle(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
     length = Gosu.distance(@end_one.x, @end_one.y, @end_two.x, @end_two.y)
-    width = 3
+    width  = 3
+
     Gosu.rotate(angle - 90, @end_one.x, @end_one.y) do
       Gosu.draw_rect(@end_one.x, @end_one.y, length, width, ORANGE, Z_ORDER)
     end
@@ -319,12 +323,14 @@ end
 
 class Field
   attr_reader :field_bmp, :blue_count
+
   Z_ORDER = 2
-  AQUA = Gosu::Color.rgba(0, 132, 132, 255)
+  AQUA    = Gosu::Color.rgba(0, 132, 132, 255)
 
   def initialize
-    @field_bmp = Array.new(FIELD_HEIGHT) { Array.new(FIELD_WIDTH) }
+    @field_bmp  = Array.new(FIELD_HEIGHT) { Array.new(FIELD_WIDTH) }
     @blue_count = 0
+
     FIELD_HEIGHT.times do |i|
       FIELD_WIDTH.times do |j|
         if i < GameDefs::Border - 1 || j < GameDefs::Border - 1 || i >= FIELD_HEIGHT - GameDefs::Border || j >= FIELD_WIDTH - GameDefs::Border
@@ -342,7 +348,6 @@ class Field
   def update
     if @modified
       modified = false
-      # @field_bmp to ImageMagic array
     end
   end
 
@@ -432,14 +437,13 @@ class Field
     end
 
     # Replace Black with Blue and Checked with Black
-    # Count fill % here
 
     FIELD_HEIGHT.times do |i|
       FIELD_WIDTH.times do |j|
          
         if @field_bmp[i][j] == GameDefs::Black
           @field_bmp[i][j] = GameDefs::Blue
-          @blue_count += 1
+          @blue_count += 1 # To count fill %
         end
 
         @field_bmp[i][j] = GameDefs::Black if @field_bmp[i][j] == GameDefs::Checked
@@ -499,9 +503,9 @@ class Player
   attr_accessor :xonii, :died_on_this_level
 
   COLLISION = 4
-  OFFSET = 3
-  SPEED = 4
-  Z_ORDER = 10
+  OFFSET    = 3
+  SPEED     = 4
+  Z_ORDER   = 10
 
   def initialize
     @image = Gosu::Image.new("#{MEDIA_DIR}/player.bmp")
@@ -599,7 +603,7 @@ class StatusBar
   STRETCH = 0.8
 
   def initialize
-    @font = Gosu::Font.new(15) # font size
+    @font = Gosu::Font.new(15)
     @status_bar_messages = 'Level: %d    Xonii: %d    Filled: %4.1f%%    Score: %d    Time: %1d:%02d'
     @sbm_time_warn       = 'Level: %d    Xonii: %d    Filled: %4.1f%%    Score: %d    <b>Time:%1d:%02d   <<< Low Time!</b>'
   end
@@ -625,14 +629,14 @@ class Xonix97 < Gosu::Window
     
     self.caption = "Xonix97"
 
-    @player = Player.new
+    @player     = Player.new
     @status_bar = StatusBar.new
 
     @level = 0
     next_level
 
-    @congrats = false
-    @show_score = false
+    @congrats    = false
+    @show_score  = false
     @skip_update = false
 
     @center_message_font = Gosu::Font.new(20)
@@ -687,7 +691,7 @@ class Xonix97 < Gosu::Window
           @player.reset_position
           @field.clean_red
 
-          @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
+          @time_limit     = GameDefs.time_limit(@level, @player.died_on_this_level)
           @time_remaining = @time_limit
 
           @show_ready = true
@@ -744,15 +748,16 @@ class Xonix97 < Gosu::Window
     @player.died_on_this_level = false
 
     if @level == 15
-      @congrats = true
+      @congrats   = true
       @show_score = true
+
       return
     end
 
-    @level += 1
-    @player.xonii += 1
-    @time_limit = GameDefs.time_limit(@level, @player.died_on_this_level)
-    @time_remaining = @time_limit
+    @level              += 1
+    @player.xonii       += 1
+    @time_limit          = GameDefs.time_limit(@level, @player.died_on_this_level)
+    @time_remaining      = @time_limit
     @percentage_complete = 18
 
     @field = Field.new
@@ -770,5 +775,4 @@ if __FILE__ == $0
   Xonix97.new.show
 end
 
-
-# Test, Polish, Pack, Video
+# Pack, video
