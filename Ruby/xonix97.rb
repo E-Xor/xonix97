@@ -4,54 +4,6 @@ require 'rubygems'
 require 'bundler/setup'
 require 'gosu'
 
-
-
-# puts "__dir__ :#{__dir__}"
-# puts
-
-# files = Dir["#{__dir__}/*"]
-# puts "files in __dir__: #{files.join(',')}"
-# puts
-
-# files = Dir["./Resources/*"]
-# puts "files in ./Resources/*: #{files.join(',')}"
-# puts
-
-# files = Dir["../Resources/*"]
-# puts "files in ../Resources/*: #{files.join(',')}"
-# puts
-
-# files = Dir["#{__dir__}/../Resources/*"]
-# puts "files in __dir__/../Resources/*: #{files.join(',')}"
-# puts
-
-# files = Dir["/*"]
-# puts "files in /*: #{files.join(',')}"
-# puts
-
-# files = Dir["~/*"]
-# puts "files in ~/*: #{files.join(',')}"
-# puts
-
-# puts 'ls -al'
-# puts `ls -al`
-# puts
-
-# puts 'ls -al ~/'
-# puts `ls -al ~/`
-# puts
-
-# puts 'ls -al /'
-# puts `ls -al /`
-# puts
-
-# puts 'pwd'
-# puts `pwd`
-# puts
-
-# print "Press ENTER to continue"
-# gets
-
 MEDIA_DIR = `pwd`.chomp + '/../Resources' # not __dir__, when compiled into binary code it has differenent return compared to pwd
 
 FIELD_WIDTH, FIELD_HEIGHT = 510, 322

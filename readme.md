@@ -45,15 +45,14 @@ brew install squashfs
 curl -L http://enclose.io/rubyc/rubyc-darwin-x64.gz | gunzip > rubyc
 chmod +x rubyc
 ./rubyc --tmpdir=/Users/maksim/Downloads/tmp --output=Xonix97.out --root=./xonix97/Ruby ./xonix97/Ruby/xonix97.rb
-# https://github.com/pmq20/ruby-packer/issues/39
 ```
 
 ## Mac OS / OS X App
 
-* Take Xonix97.out from the previous step and put in Resource folder. `mv Xonix97.out xonix97/Resources/Xonix97`
+* Take Xonix97.out from the previous step and put in Resource folder `mv Xonix97.out xonix97/Resources/Xonix97`
 * Test `cd xonix97/Resources; ./Xonix97`
-* Install Platypus app.
-* Create a new shell script app.
+* Install Platypus app
+* Create a new shell script app in the Platypus
   * App Name: Xonix97
   * Icon -> "Select .icns File...": xonix97/Resources/AppIcon.icns
   * Script Type: Shell
