@@ -726,5 +726,3 @@ end
 if __FILE__ == $0
   Xonix97.new.show
 end
-
-# Pack, video
