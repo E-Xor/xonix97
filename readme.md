@@ -57,11 +57,11 @@ chmod +x rubyc
   * Icon -> "Select .icns File...": xonix97/Resources/AppIcon.icns
   * Script Type: Shell
   * Script Path: /path/to/xonix97/launch_xonix.sh
-  * Interface: Text Window
+  * Interface: None
   * Identifier: com.apple.Xonix97
   * Author: Maksim Sundukov
   * Version: 1.0
-  * Check: Remain running after execution
+  * Uncheck: Remain running after execution
   * Uncheck: Run with root priveleges
   * Uncheck: Run in background
   * Uncheck: Accept dropped items

@@ -257,11 +257,14 @@ class OrangeLine
     y = y1
     x1.upto(x2) do |x|
       pixel = steep ? [y,x] : [x,y]
-      field_bmp[pixel[1]][pixel[0]] = GameDefs::Black
+      field_bmp[pixel[1]][pixel[0]]   = GameDefs::Black
+
+      # Make it fat
       field_bmp[pixel[1]+1][pixel[0]] = GameDefs::Black
       field_bmp[pixel[1]][pixel[0]+1] = GameDefs::Black
       field_bmp[pixel[1]-1][pixel[0]] = GameDefs::Black
       field_bmp[pixel[1]][pixel[0]-1] = GameDefs::Black
+
       error -= delta_y
       if error < 0
         y += up_or_down
