@@ -6,6 +6,10 @@ The main difference between Xonix32 and original Xonix is moving orange lines th
 
 This version also allows red line to selve-intersect. I think it was not allowed originally to keep Flood Fill faster.
 
+## Demo
+
+[How it looks, works and the creation process](https://www.youtube.com/watch?v=VqO5XDNauws)
+
 ## Why
 
 To learn:
@@ -14,21 +18,21 @@ To learn:
 1. Flood Fill algorithm
 1. Bresenham's Line algorithm
 1. Generate binaries from Ruby
-1. Make Mac/OS X app from Ruby binary
+1. How to make Mac/OS X app from Ruby binary
 
 Despite visual simplicity this game provides an opportunity to learn and experiment with a couple of pretty cool algorithms.
 
 ## The real story
 
-I actually attempted to do it when I was 18-20 yo and I thought it's way too hard and my solution is terrible. Looking back I was actually pretty good despite making some not very efficient decisions.
+I actually attempted to do it when I was 18-20 yo and I thought it's way too hard and my solution is terrible. Looking back, I was actually pretty good despite making some not very efficient decisions.
 
-This time I decided to spend more time on reverse-engineering the game instead of just coming up with my own solutions first. I knew that source code of an older Xonix32 version is available, had to dig a little on the Internet. Also had to find and install Windows98 and Visual C++ 6.0 in a virtual machine.
+This time I decided to spend more time on reverse-engineering the game instead of working on my own solution first. I knew that the source code of Xonix32 is available, had to dig a little on the Internet. Also had to find and install Windows98 and Visual C++ 6.0 in a virtual machine.
 
-Ability to play around with the code helped a lot to understand the approach as well as reproduce the game more closely.
+Ability to play around with the code helped a lot to understand the original approach as well as reproduce the game more closely.
 
 ## What's up with the folder structure?
 
-Ruby code goes into binary and binary goes into Mac/OS X App. Currently using rubyc for binary creating and Platypus for the app. That folder structure makes it easier to manipulate all these transformations.
+Ruby code is put into a binary and the binary is put into Mac/OS X App. Rubyc generates binaries and Platypus creates Mac OS app. That folder structure makes it easier to manipulate all these transformations.
 
 ## Gosu
 
